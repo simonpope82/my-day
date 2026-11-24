@@ -1,0 +1,14 @@
+{
+  "name": "my-day",
+  "version": "1.0.0",
+  "private": true,
+  "description": "My Day — Tay's personal daily dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

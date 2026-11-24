@@ -1,0 +1,298 @@
+'use strict';
+
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const { createStoreFromEnv } = require('./lib/store');
+const { createItem, applyFields } = require('./lib/items');
+const { buildToday, recentDone } = require('./lib/today');
+const { osloDate, osloWeekdayName } = require('./lib/dates');
+const { isCategory, CATEGORIES } = require('./public/shared/categories');
+const auth = require('./lib/auth');
+
+function loadSecrets() {
+  const file = path.join(__dirname, 'secrets.env');
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (!match || process.env[match[1]]) continue;
+    process.env[match[1]] = match[2].trim();
+  }
+}
+loadSecrets();
+
+const publicDir = path.join(__dirname, 'public');
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
+  '.png': 'image/png',
+  '.woff2': 'font/woff2',
+  '.svg': 'image/svg+xml',
+  '.txt': 'text/plain; charset=utf-8',
+  '.ico': 'image/x-icon',
+};
+
+function securityHeaders() {
+  return {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; script-src 'self'",
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  };
+}
+
+function send(res, status, body, extra) {
+  const payload = JSON.stringify(body);
+  res.writeHead(status, {
+    ...securityHeaders(),
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Length': Buffer.byteLength(payload),
+    ...(extra || {}),
+  });
+  res.end(payload);
+}
+
+function fail(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+async function readJson(req) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 100000) throw fail(413, 'Too big');
+    chunks.push(chunk);
+  }
+  if (!size) return {};
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    throw fail(400, 'Bad JSON');
+  }
+}
+
+function requireUser(req) {
+  if (auth.bearerOk(req)) return 'token';
+  if (auth.cookieOk(req)) {
+    if (!auth.originOk(req)) throw fail(403, 'Blocked');
+    return 'cookie';
+  }
+  throw fail(401, 'Locked');
+}
+
+function safeFile(urlPath) {
+  let decoded = urlPath;
+  try { decoded = decodeURIComponent(urlPath); } catch { return null; }
+  if (decoded.includes('\0')) return null;
+  const full = path.resolve(publicDir, `.${path.posix.normalize(`/${decoded}`)}`);
+  if (full !== publicDir && !full.startsWith(`${publicDir}${path.sep}`)) return null;
+  return full;
+}
+
+function cacheControl(filePath) {
+  const base = path.basename(filePath);
+  if (base === 'sw.js' || base === 'app.js' || base === 'app.css' || base === 'index.html') return 'no-cache';
+  return 'public, max-age=86400';
+}
+
+function sendFile(res, filePath) {
+  const ext = path.extname(filePath);
+  const type = MIME[ext] || 'application/octet-stream';
+  const body = fs.readFileSync(filePath);
+  res.writeHead(200, {
+    ...securityHeaders(),
+    'Content-Type': type,
+    'Cache-Control': cacheControl(filePath),
+    'Content-Length': body.length,
+  });
+  res.end(body);
+}
+
+function findItem(doc, id) {
+  return doc.items.find((item) => item.id === id);
+}
+
+async function handle(req, res, store) {
+  const url = new URL(req.url, 'http://localhost');
+  const { pathname } = url;
+  if (req.method === 'GET' && pathname === '/health') {
+    return send(res, 200, { ok: true });
+  }
+  if (req.method === 'GET' && pathname === '/robots.txt') {
+    const body = 'User-agent: *\nDisallow: /\n';
+    res.writeHead(200, { ...securityHeaders(), 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' });
+    return res.end(body);
+  }
+
+  try {
+    if (pathname.startsWith('/api/')) return await api(req, res, store, url);
+    if (req.method !== 'GET' && req.method !== 'HEAD') throw fail(405, 'No');
+    const rel = pathname === '/' ? '/index.html' : pathname;
+    const filePath = safeFile(rel);
+    if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      if (pathname === '/' || pathname === '/index.html') throw fail(404, 'Missing');
+      throw fail(404, 'Not found');
+    }
+    if (req.method === 'HEAD') {
+      res.writeHead(200, { ...securityHeaders(), 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' });
+      return res.end();
+    }
+    return sendFile(res, filePath);
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error(err.detail || err.message);
+    if (!res.headersSent) send(res, status, { error: status >= 500 ? 'Something went wrong' : err.message });
+  }
+}
+
+async function api(req, res, store, url) {
+  const { pathname } = url;
+
+  if (req.method === 'POST' && pathname === '/api/login') {
+    if (!auth.originOk(req)) throw fail(403, 'Blocked');
+    const limit = auth.rateLimit(auth.clientIp(req));
+    if (limit.blocked) throw fail(429, 'Wait a minute');
+    const body = await readJson(req);
+    const pin = String(body.pin == null ? '' : body.pin).trim();
+    const expected = String(process.env.APP_PIN || '');
+    if (!expected || !auth.safeEqual(pin, expected)) {
+      limit.fail();
+      throw fail(401, 'Wrong code');
+    }
+    return send(res, 200, { ok: true }, { 'Set-Cookie': auth.cookieHeader(req, auth.signSession(), 60 * 24 * 60 * 60) });
+  }
+
+  if (req.method === 'POST' && pathname === '/api/logout') {
+    return send(res, 200, { ok: true }, { 'Set-Cookie': auth.cookieHeader(req, '', 0) });
+  }
+
+  requireUser(req);
+
+  if (req.method === 'GET' && pathname === '/api/me') return send(res, 200, { ok: true });
+  if (req.method === 'GET' && pathname === '/api/categories') return send(res, 200, { categories: CATEGORIES });
+
+  if (req.method === 'POST' && pathname === '/api/parse') {
+    const { parseItem } = require('./lib/parse');
+    const body = await readJson(req);
+    return send(res, 200, parseItem(body.text || '', { now: new Date() }));
+  }
+
+  if (req.method === 'GET' && pathname === '/api/today') {
+    const doc = await store.load();
+    const now = new Date();
+    const view = buildToday(doc.items, now);
+    view.weekday = osloWeekdayName(now);
+    return send(res, 200, view);
+  }
+
+  if (req.method === 'GET' && pathname === '/api/items') {
+    const doc = await store.load();
+    let items = doc.items.slice();
+    const done = url.searchParams.get('done');
+    if (done === 'true') items = items.filter((item) => item.done);
+    if (done === 'false') items = items.filter((item) => !item.done);
+    const category = url.searchParams.get('category');
+    if (category) {
+      if (!isCategory(category)) throw fail(400, 'Unknown group');
+      items = items.filter((item) => item.category === category);
+    }
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
+    if (from) items = items.filter((item) => item.due && item.due >= from);
+    if (to) items = items.filter((item) => item.due && item.due <= to);
+    items.sort((a, b) => String(a.due || '9999').localeCompare(String(b.due || '9999')));
+    const today = osloDate(new Date());
+    return send(res, 200, { items, recentDone: recentDone(doc.items, today, 30) });
+  }
+
+  const one = pathname.match(/^\/api\/items\/([0-9a-f-]{36})$/i);
+
+  if (req.method === 'POST' && pathname === '/api/items') {
+    const body = await readJson(req);
+    const now = new Date();
+    const item = createItem(body, now);
+    const doc = await store.update((draft) => { draft.items.push(item); });
+    const saved = doc.items.find((row) => row.id === item.id) || item;
+    return send(res, 201, { item: saved });
+  }
+
+  if (one && req.method === 'GET') {
+    const doc = await store.load();
+    const item = findItem(doc, one[1]);
+    if (!item) throw fail(404, 'Not found');
+    return send(res, 200, { item });
+  }
+
+  if (one && req.method === 'PATCH') {
+    const body = await readJson(req);
+    const now = new Date();
+    let updated = null;
+    await store.update((draft) => {
+      const item = findItem(draft, one[1]);
+      if (!item) return;
+      applyFields(item, body, now);
+      updated = item;
+    });
+    if (!updated) throw fail(404, 'Not found');
+    const doc = await store.load();
+    return send(res, 200, { item: findItem(doc, one[1]) });
+  }
+
+  if (one && req.method === 'DELETE') {
+    let removed = false;
+    await store.update((draft) => {
+      const before = draft.items.length;
+      draft.items = draft.items.filter((item) => item.id !== one[1]);
+      removed = draft.items.length !== before;
+    });
+    if (!removed) throw fail(404, 'Not found');
+    return send(res, 200, { ok: true });
+  }
+
+  throw fail(404, 'Not found');
+}
+
+function listen(store, port, host) {
+  const server = http.createServer((req, res) => {
+    handle(req, res, store).catch((err) => {
+      console.error(err);
+      if (!res.headersSent) send(res, 500, { error: 'Something went wrong' });
+    });
+  });
+  const where = host || process.env.HOST || '0.0.0.0';
+  return new Promise((resolve) => {
+    server.listen(Number(port), where, () => resolve(server));
+  });
+}
+
+async function main() {
+  try {
+    auth.assertSecrets();
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+  let store;
+  try {
+    store = createStoreFromEnv();
+    await store.ready();
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+  const port = Number(process.env.PORT || 3000);
+  const server = await listen(store, port);
+  console.log(`My Day on :${server.address().port} (store: ${store.kind})`);
+}
+
+if (require.main === module) main();
+
+module.exports = { handle, listen, main };

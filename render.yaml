@@ -1,0 +1,33 @@
+# Render free web service. The disk is wiped on restart — that is fine.
+# Items live in the private GitHub repo, branch `data`, file `items.json`.
+services:
+  - type: web
+    name: my-day
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: APP_PIN
+        sync: false
+      - key: API_TOKEN
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: DATA_REPO
+        value: simonpope82/my-day
+      - key: DATA_BRANCH
+        value: data
+      - key: DATA_PATH
+        value: items.json
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: TRUST_PROXY
+        value: "1"
