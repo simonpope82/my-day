@@ -200,4 +200,53 @@ Prefer `POST /api/items` for new items. The app parses the line, keeps a conflic
 }
 ```
 
+Morning brief. Post one brief per Oslo date. The same date replaces the previous brief. The app keeps about 14 days in `brief.json` in the private data repo, next to `items.json`. Do not repeat tasks, bills, email replies, or calendar events here. Those already come from the app. Weather is shown first.
+
+```bash
+curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
+  "$MYDAY_URL/api/brief" \
+  -H "Authorization: Bearer $MYDAY_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "date": "2026-11-24",
+    "sections": [
+      {
+        "key": "weather",
+        "title": "Weather",
+        "emoji": "🌧️",
+        "lines": [
+          {"text": "6°. Rain this afternoon."},
+          {"text": "Coat and boots."}
+        ]
+      },
+      {
+        "key": "birthdays",
+        "title": "Birthdays",
+        "emoji": "🎂",
+        "lines": [
+          {"text": "Nina, Friday."}
+        ]
+      },
+      {
+        "key": "parcels",
+        "title": "Parcels",
+        "emoji": "📦",
+        "lines": [
+          {"text": "Posten Ås. Code 4821."}
+        ]
+      },
+      {
+        "key": "jobs",
+        "title": "Jobs",
+        "emoji": "💼",
+        "lines": [
+          {"text": "Electrician, Ås", "link": "https://example.com/job/1"}
+        ]
+      }
+    ]
+  }'
+```
+
+`GET /api/brief?date=2026-11-24` returns `{ "brief": { "date", "sections" } }`. If that day has no brief, `brief` is `null`. `GET /api/today` includes the same `brief` for today. The Today screen shows it at the top. No brief means no card and no error.
+
 Other routes: `GET /api/me`, `GET /api/items/ITEM_ID`, `POST /api/parse` with `{"text":"..."}`, `POST /api/login` with `{"pin":"..."}` (phone only), `POST /api/logout`, `GET /health` (no secret, no items).

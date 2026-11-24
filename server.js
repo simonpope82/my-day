@@ -5,11 +5,12 @@ process.env.TZ = process.env.TZ || 'Europe/Oslo';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { createStoreFromEnv } = require('./lib/store');
+const { createStoreFromEnv, createBriefStoreFromEnv } = require('./lib/store');
 const { createItem, applyFields, cleanExternalId } = require('./lib/items');
 const { buildToday, recentDone } = require('./lib/today');
 const { osloDate, osloWeekdayName } = require('./lib/dates');
 const { upcomingEvents, eventSummary } = require('./lib/calendars');
+const { normalizeBrief, applyBrief, briefFor } = require('./lib/briefs');
 const { isCategory, CATEGORIES } = require('./public/shared/categories');
 const auth = require('./lib/auth');
 
@@ -123,7 +124,7 @@ function findItem(doc, id) {
   return doc.items.find((item) => item.id === id);
 }
 
-async function handle(req, res, store) {
+async function handle(req, res, store, briefs) {
   const url = new URL(req.url, 'http://localhost');
   const { pathname } = url;
   if (req.method === 'GET' && pathname === '/health') {
@@ -136,7 +137,7 @@ async function handle(req, res, store) {
   }
 
   try {
-    if (pathname.startsWith('/api/')) return await api(req, res, store, url);
+    if (pathname.startsWith('/api/')) return await api(req, res, store, url, briefs);
     if (req.method !== 'GET' && req.method !== 'HEAD') throw fail(405, 'No');
     const rel = pathname === '/' ? '/index.html' : pathname;
     const filePath = safeFile(rel);
@@ -156,7 +157,7 @@ async function handle(req, res, store) {
   }
 }
 
-async function api(req, res, store, url) {
+async function api(req, res, store, url, briefs) {
   const { pathname } = url;
 
   if (req.method === 'POST' && pathname === '/api/login') {
@@ -202,7 +203,33 @@ async function api(req, res, store, url) {
     } catch {
       view.calendarError = 'Calendar not loaded';
     }
+    view.brief = null;
+    try {
+      if (briefs) view.brief = briefFor(await briefs.load(), view.date);
+    } catch {
+      view.brief = null;
+    }
     return send(res, 200, view);
+  }
+
+  if (pathname === '/api/brief' && req.method === 'GET') {
+    const date = url.searchParams.get('date') || osloDate(new Date());
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw fail(400, 'Bad date');
+    const doc = briefs ? await briefs.load() : { days: [] };
+    return send(res, 200, { brief: briefFor(doc, date) });
+  }
+
+  if (pathname === '/api/brief' && req.method === 'POST') {
+    if (!briefs) throw fail(503, 'Brief store is not available');
+    const body = await readJson(req);
+    const brief = normalizeBrief(body);
+    await briefs.update((draft) => {
+      const next = applyBrief(draft, brief);
+      draft.v = next.v;
+      draft.days = next.days;
+      draft.updatedAt = next.updatedAt;
+    });
+    return send(res, 200, { brief });
   }
 
   if (req.method === 'GET' && pathname === '/api/items') {
@@ -284,9 +311,10 @@ async function api(req, res, store, url) {
   throw fail(404, 'Not found');
 }
 
-function listen(store, port, host) {
+function listen(store, port, host, briefStore) {
+  const briefs = briefStore || createBriefStoreFromEnv();
   const server = http.createServer((req, res) => {
-    handle(req, res, store).catch((err) => {
+    handle(req, res, store, briefs).catch((err) => {
       console.error(err);
       if (!res.headersSent) send(res, 500, { error: 'Something went wrong' });
     });

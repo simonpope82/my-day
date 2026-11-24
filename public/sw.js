@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE = 'myday-v3';
+const CACHE = 'myday-v4';
 const SHELL = [
   '/',
   '/app.css',

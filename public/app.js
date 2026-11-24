@@ -461,6 +461,26 @@ function openLink(url, label) {
   }, label || 'Open');
 }
 
+function briefPanel(brief) {
+  if (!brief || !Array.isArray(brief.sections) || !brief.sections.length) return null;
+  return el('div', { class: 'brief' }, brief.sections.map((section) => el('details', {
+    class: 'brief-card',
+    'data-key': section.key || 'note',
+    open: true,
+  }, [
+    el('summary', {}, [
+      el('span', { class: 'emoji', 'aria-hidden': 'true' }, section.emoji || '📌'),
+      el('span', { class: 'brief-title' }, section.title || 'Note'),
+    ]),
+    el('ul', {}, section.lines.map((line) => {
+      const href = safeHttpUrl(line.link);
+      return el('li', {}, href
+        ? el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, line.text)
+        : line.text);
+    })),
+  ])));
+}
+
 function replyRows() {
   return (state.items || []).filter((item) => item.category === 'email' && !item.done);
 }
@@ -500,6 +520,7 @@ function todayScreen() {
   const events = eventLists();
   const bits = [
     header('Today', data.date ? shortDate(data.date) : ''),
+    briefPanel(data.brief),
   ];
   if (data.counts && data.counts.total) bits.push(progress(data.counts));
   if (events.today.length) {
@@ -510,13 +531,13 @@ function todayScreen() {
   } else if (data.calendarError && !events.soon.length) bits.push(el('p', { class: 'quiet' }, 'Calendar not loaded'));
   if (!late.length && !openToday.length) {
     if (done.length) bits.push(el('div', { class: 'banner' }, 'All done'));
-    else if (!soon.length && !events.soon.length && !events.today.length) {
+    else if (!soon.length && !events.soon.length && !events.today.length && !(data.brief && data.brief.sections && data.brief.sections.length)) {
       bits.push(el('div', { class: 'empty' }, [
         el('div', { class: 'sun', html: ICONS.sun }),
         el('h2', {}, 'Nothing today'),
         el('p', {}, 'Tap + to add'),
       ]));
-    } else if (!events.today.length) bits.push(el('p', { class: 'quiet' }, 'Nothing today.'));
+    } else if (!events.today.length && !(data.brief && data.brief.sections && data.brief.sections.length)) bits.push(el('p', { class: 'quiet' }, 'Nothing today.'));
   }
   bits.push(replySection());
   bits.push(section('Late', late, true));
