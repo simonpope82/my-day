@@ -33,8 +33,8 @@ test('github store creates a missing file and retries a conflict', async () => {
     });
   };
   const store = createGithubStore({
-    repo: 'simonpope82/my-day',
-    branch: 'data',
+    repo: 'simonpope82/my-day-data',
+    branch: 'main',
     filePath: 'items.json',
     token: 'test-token',
     fetchImpl,
@@ -53,11 +53,11 @@ test('github store creates a missing file and retries a conflict', async () => {
 test('missing data branch is an error, not an empty list', async () => {
   const fetchImpl = async (url) => {
     if (!url.includes('/contents/')) return response(200, { private: true });
-    return response(404, { message: 'No commit found for the ref data' });
+    return response(404, { message: 'No commit found for the ref main' });
   };
   const store = createGithubStore({
-    repo: 'simonpope82/my-day',
-    branch: 'data',
+    repo: 'simonpope82/my-day-data',
+    branch: 'main',
     filePath: 'items.json',
     token: 'test-token',
     fetchImpl,

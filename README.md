@@ -2,7 +2,7 @@
 
 Tay's daily list. Big type, big buttons, short words. Works on an iPhone home screen and on a computer.
 
-The list is **not** stored on the Render disk. Render's free plan wipes that disk on every restart. Items are saved in this private repo, on the branch `data`, in `items.json`. A restart or a new deploy does not delete them.
+The list is **not** stored on the Render disk. Render's free plan wipes that disk on every restart. Items are saved in the private repo [`simonpope82/my-day-data`](https://github.com/simonpope82/my-day-data), on the default branch `main`, in `items.json`. Set `DATA_REPO`, `DATA_BRANCH` and `DATA_PATH` to point somewhere else. A restart or a new deploy does not delete them.
 
 ## On iPhone
 
@@ -47,16 +47,16 @@ Do not commit these. On Render they are environment variables. Locally they can 
 | `APP_PIN` | Render, and tell Tay | The code for the phone. 6 digits is a good length. |
 | `API_TOKEN` | Render, and the assistant's notes | Long token for the API below. Not the PIN. |
 | `SESSION_SECRET` | Render | Signs the login cookie. If you leave it empty, the app uses `API_TOKEN`. |
-| `GITHUB_TOKEN` | Render only | Fine-grained GitHub token. Repo: `simonpope82/my-day` only. Permission: **Contents: Read and write**. |
-| `DATA_REPO` | already in `render.yaml` | `simonpope82/my-day` |
-| `DATA_BRANCH` | already in `render.yaml` | `data` |
+| `GITHUB_TOKEN` | Render only | Fine-grained GitHub token. Repo: `simonpope82/my-day-data` only. Permission: **Contents: Read and write**. |
+| `DATA_REPO` | already in `render.yaml` | `simonpope82/my-day-data` |
+| `DATA_BRANCH` | already in `render.yaml` | `main` |
 | `DATA_PATH` | already in `render.yaml` | `items.json` |
 | `COOKIE_SECURE` | already in `render.yaml` | `1` on Render |
 | `TRUST_PROXY` | already in `render.yaml` | `1` on Render |
 
 `./deploy-render.sh` creates `APP_PIN`, `API_TOKEN` and `SESSION_SECRET` in `secrets.env` the first time. It does not print them.
 
-GitHub token: [fine-grained tokens](https://github.com/settings/personal-access-tokens). If the token from **costa-rica-sync** can write this repo, you can reuse it. A token that can only write `simonpope82/costa-rica-data` will not work here. You can point this app at that repo instead by setting `DATA_REPO=simonpope82/costa-rica-data`, `DATA_BRANCH=main`, `DATA_PATH=my-day.json`. A separate file will not touch the trip `data.json`.
+GitHub token: [fine-grained tokens](https://github.com/settings/personal-access-tokens). It must be able to read and write `simonpope82/my-day-data`. This is the same pattern as **costa-rica-sync** (public code) and **costa-rica-data** (private list). A token that can only write `simonpope82/costa-rica-data` will not work here.
 
 Render API key, only for the deploy script: [API keys](https://dashboard.render.com/u/settings#api-keys). An account key named **grok agent** was created on 19 Oct 2026. The secret value is only shown once, so if it was not saved, create a new key.
 
@@ -64,11 +64,11 @@ Render API key, only for the deploy script: [API keys](https://dashboard.render.
 GITHUB_TOKEN=github_pat_… RENDER_API_KEY=rnd_… ./deploy-render.sh
 ```
 
-The GitHub app on Render must be allowed to see the private repo `simonpope82/my-day`. In the Render dashboard: Account Settings → GitHub, and include this repo.
+This code repo can be public. Render only needs to clone it. The running app writes the private data repo with `GITHUB_TOKEN`, so Render's GitHub app does not need access to `my-day-data`.
 
-The free service sleeps after a quiet spell. The first open can take up to a minute. The list is still safe. Data writes do not redeploy the site, because they land on the `data` branch, not `main`.
+The free service sleeps after a quiet spell. The first open can take up to a minute. The list is still safe. Data writes do not redeploy the site, because they land in `simonpope82/my-day-data`, not in this repo.
 
-Mute GitHub email for the `data` branch if ticks start sending you mail.
+Mute GitHub email for `my-day-data` if ticks start sending you mail.
 
 ## For the assistant
 
@@ -132,7 +132,7 @@ curl -fsS -X DELETE "$MYDAY_URL/api/items/ITEM_ID" \
 If Render is asleep, the curls above wake it. `--retry` covers the cold start. To read without waiting, use GitHub. This does not need the app to be awake:
 
 ```bash
-gh api "/repos/simonpope82/my-day/contents/items.json?ref=data" --jq .content | base64 -d
+gh api "/repos/simonpope82/my-day-data/contents/items.json?ref=main" --jq .content | base64 -d
 ```
 
 Prefer `POST /api/items` for new items. The app parses the line, keeps a conflict retry, and will not clobber a tick that happens at the same time. The file shape is:

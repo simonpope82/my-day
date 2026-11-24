@@ -1,5 +1,5 @@
 # Render free web service. The disk is wiped on restart — that is fine.
-# Items live in the private GitHub repo, branch `data`, file `items.json`.
+# Items live in the private GitHub repo simonpope82/my-day-data, file `items.json`.
 services:
   - type: web
     name: my-day
@@ -22,9 +22,9 @@ services:
       - key: GITHUB_TOKEN
         sync: false
       - key: DATA_REPO
-        value: simonpope82/my-day
+        value: simonpope82/my-day-data
       - key: DATA_BRANCH
-        value: data
+        value: main
       - key: DATA_PATH
         value: items.json
       - key: COOKIE_SECURE

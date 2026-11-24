@@ -69,8 +69,8 @@ const values = {
   API_TOKEN: process.env.API_TOKEN,
   SESSION_SECRET: process.env.SESSION_SECRET,
   GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-  DATA_REPO: "simonpope82/my-day",
-  DATA_BRANCH: "data",
+  DATA_REPO: "simonpope82/my-day-data",
+  DATA_BRANCH: "main",
   DATA_PATH: "items.json",
   COOKIE_SECURE: "1",
   TRUST_PROXY: "1"
@@ -90,7 +90,7 @@ if [[ -z "${RENDER_API_KEY:-}" ]]; then
   die "RENDER_API_KEY is not set. Create one at https://dashboard.render.com/u/settings#api-keys (a key named grok agent already exists on this account)."
 fi
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
-  die "GITHUB_TOKEN is not set. Use a fine-grained PAT for simonpope82/my-day with Contents: Read and write. The same token used by costa-rica-sync works if it can write this repo."
+  die "GITHUB_TOKEN is not set. Use a fine-grained PAT for simonpope82/my-day-data with Contents: Read and write. The same token used by costa-rica-sync works if it can write that data repo."
 fi
 
 api() {
