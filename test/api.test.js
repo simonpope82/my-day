@@ -136,6 +136,49 @@ test('category override, open list, and cross-site cookie block', async () => {
   assert.equal(blocked.status, 403);
 });
 
+test('email externalId is kept once, even after it is done', async () => {
+  const payload = {
+    title: 'Please reply',
+    category: 'email',
+    source: 'gmail',
+    externalId: 'gmail:abc',
+    link: 'https://mail.google.com/mail/u/0/#inbox/abc',
+  };
+  const first = await fetch(`${base}/api/items`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  assert.equal(first.status, 201);
+  const created = (await first.json()).item;
+  assert.equal(created.category, 'email');
+  assert.equal(created.link, payload.link);
+  await fetch(`${base}/api/items/${created.id}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ done: true }),
+  });
+  const second = await fetch(`${base}/api/items`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ ...payload, title: 'A different title' }),
+  });
+  assert.equal(second.status, 200);
+  const again = (await second.json()).item;
+  assert.equal(again.id, created.id);
+  assert.equal(again.done, true);
+  assert.equal(again.title, 'Please reply');
+  const today = await fetch(`${base}/api/today`, { headers: authHeaders() });
+  const view = await today.json();
+  assert.equal(view.today.some((item) => item.id === created.id), false);
+  const bad = await fetch(`${base}/api/items`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ title: 'Nope', link: 'javascript:alert(1)' }),
+  });
+  assert.equal(bad.status, 400);
+});
+
 test('repeat tick advances and undo restores', async () => {
   const added = await fetch(`${base}/api/items`, {
     method: 'POST',

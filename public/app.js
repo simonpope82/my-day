@@ -16,9 +16,12 @@ const ICONS = {
   family: svg(`<circle ${S} cx="8" cy="9" r="2.2"/><circle ${S} cx="16" cy="9" r="2.2"/><path ${S} d="M4.5 18c.6-2.2 2.2-3.4 3.5-3.4S11 15.8 11.5 18M12.5 18c.6-2.2 2.2-3.4 3.5-3.4S18.9 15.8 19.5 18"/>`),
   health: svg(`<path ${S} d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/>`),
   work: svg(`<rect ${S} x="3" y="7" width="18" height="13" rx="2"/><path ${S} d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/>`),
+  business: svg(`<rect ${S} x="4" y="3" width="16" height="18" rx="1"/><path ${S} d="M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M10 21v-4h4v4"/>`),
+  email: svg(`<rect ${S} x="3" y="5" width="18" height="14" rx="2"/><path ${S} d="m4 7 8 6 8-6"/>`),
   home: svg(`<path ${S} d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/>`),
   money: svg(`<circle ${S} cx="12" cy="12" r="8"/><path ${S} d="M12 7.5v9M9.5 9.5c.6-1 1.4-1.4 2.5-1.4 1.4 0 2.4.7 2.4 1.8S13.4 12 12 12s-2.6.7-2.6 1.9 1.2 1.9 2.6 1.9c1.1 0 2-.4 2.6-1.2"/>`),
   other: svg(`<circle ${S} cx="6" cy="12" r="1.2"/><circle ${S} cx="12" cy="12" r="1.2"/><circle ${S} cx="18" cy="12" r="1.2"/>`),
+  calendar: svg(`<rect ${S} x="3" y="5" width="18" height="16" rx="2"/><path ${S} d="M3 10h18M8 3v4M16 3v4"/>`),
 };
 
 const REPEATS = [
@@ -390,29 +393,156 @@ function progress(counts) {
   ]);
 }
 
+function eventWhen(event) {
+  if (event.allDay) return 'All day';
+  if (event.start && event.end) return `${event.start}–${event.end}`;
+  return event.start || '';
+}
+
+function eventCard(event, showDate) {
+  const bits = [];
+  if (showDate && event.date) bits.push(friendly(event.date));
+  if (event.calendar) bits.push(event.calendar);
+  if (event.location) bits.push(event.location);
+  return el('article', { class: 'card event' }, [
+    el('span', { class: 'when' }, eventWhen(event)),
+    el('span', {
+      class: 'badge cal',
+      style: `background:#e7f0ff;color:${event.color || '#1d5fd0'}`,
+      html: ICONS.calendar,
+    }),
+    el('span', { class: 'card-text' }, [
+      el('span', { class: 'title' }, event.title),
+      bits.length ? el('span', { class: 'meta' }, bits.join(' · ')) : null,
+    ]),
+  ]);
+}
+
+function eventLists() {
+  const data = state.data || {};
+  const today = data.date || '';
+  const until = today ? addDays(today, 7) : '';
+  const all = data.events || [];
+  return {
+    today: all.filter((event) => event.date === today),
+    soon: all.filter((event) => today && event.date > today && event.date <= until),
+  };
+}
+
+function comingUpSection(tasks, events) {
+  const rows = [
+    ...events.map((event) => ({ kind: 'event', date: event.date, sort: event.start || '00:00', event })),
+    ...tasks.map((item) => ({ kind: 'task', date: item.due || '9999-99-99', sort: '99:99', item })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.sort.localeCompare(b.sort));
+  if (!rows.length) return null;
+  return el('section', {}, [
+    el('h2', { class: 'section' }, 'Coming up'),
+    el('div', { class: 'stack' }, rows.map((row) => (row.kind === 'event' ? eventCard(row.event, true) : card(row.item, false)))),
+  ]);
+}
+
+function safeHttpUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    if (url.protocol === 'https:' || url.protocol === 'http:') return url.href;
+  } catch { /* not a link */ }
+  return '';
+}
+
+function openLink(url, label) {
+  const href = safeHttpUrl(url);
+  if (!href) return null;
+  return el('a', {
+    class: 'open-link',
+    href,
+    target: '_blank',
+    rel: 'noopener noreferrer',
+    onclick: (event) => event.stopPropagation(),
+  }, label || 'Open');
+}
+
+function briefPanel(brief) {
+  if (!brief || !Array.isArray(brief.sections) || !brief.sections.length) return null;
+  return el('div', { class: 'brief' }, brief.sections.map((section) => el('details', {
+    class: 'brief-card',
+    'data-key': section.key || 'note',
+    open: true,
+  }, [
+    el('summary', {}, [
+      el('span', { class: 'emoji', 'aria-hidden': 'true' }, section.emoji || '📌'),
+      el('span', { class: 'brief-title' }, section.title || 'Note'),
+    ]),
+    el('ul', {}, section.lines.map((line) => {
+      const href = safeHttpUrl(line.link);
+      return el('li', {}, href
+        ? el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, line.text)
+        : line.text);
+    })),
+  ])));
+}
+
+function replyRows() {
+  return (state.items || []).filter((item) => item.category === 'email' && !item.done);
+}
+
+function replySection() {
+  const rows = replyRows();
+  if (!rows.length) return null;
+  const cat = MYDAY.byId('email');
+  return el('section', {}, [
+    el('h2', { class: 'section' }, [
+      'Reply to',
+      el('span', { class: 'pill' }, String(rows.length)),
+    ]),
+    el('div', { class: 'stack' }, rows.map((item) => el('article', { class: 'reply' }, [
+      el('button', {
+        class: `tick${item.done ? ' on' : ''}`,
+        type: 'button',
+        'aria-label': `Done: ${item.title}`,
+        onclick: () => tick(item),
+      }, [el('span', { html: ICONS.check })]),
+      el('span', { class: 'badge', style: `background:${cat.tint};color:${cat.color}`, html: ICONS.email }),
+      el('button', { class: 'reply-title', type: 'button', onclick: () => openEdit(item) }, [
+        el('span', { class: 'title' }, item.title),
+        item.source ? el('span', { class: 'meta' }, item.source) : null,
+      ]),
+      openLink(item.link, 'Open'),
+    ]))),
+  ]);
+}
+
 function todayScreen() {
   const data = state.data;
   const openToday = data.today || [];
   const late = data.overdue || [];
   const soon = data.upcoming || [];
   const done = data.doneToday || [];
+  const events = eventLists();
   const bits = [
     header('Today', data.date ? shortDate(data.date) : ''),
+    briefPanel(data.brief),
   ];
   if (data.counts && data.counts.total) bits.push(progress(data.counts));
+  if (events.today.length) {
+    bits.push(el('section', {}, [
+      el('h2', { class: 'section' }, 'Calendar'),
+      el('div', { class: 'stack' }, events.today.map((event) => eventCard(event, false))),
+    ]));
+  } else if (data.calendarError && !events.soon.length) bits.push(el('p', { class: 'quiet' }, 'Calendar not loaded'));
   if (!late.length && !openToday.length) {
     if (done.length) bits.push(el('div', { class: 'banner' }, 'All done'));
-    else if (!soon.length) {
+    else if (!soon.length && !events.soon.length && !events.today.length && !(data.brief && data.brief.sections && data.brief.sections.length)) {
       bits.push(el('div', { class: 'empty' }, [
         el('div', { class: 'sun', html: ICONS.sun }),
         el('h2', {}, 'Nothing today'),
         el('p', {}, 'Tap + to add'),
       ]));
-    } else bits.push(el('p', { class: 'quiet' }, 'Nothing today.'));
+    } else if (!events.today.length && !(data.brief && data.brief.sections && data.brief.sections.length)) bits.push(el('p', { class: 'quiet' }, 'Nothing today.'));
   }
+  bits.push(replySection());
   bits.push(section('Late', late, true));
   bits.push(section('Today', openToday, false));
-  bits.push(section('Coming up', soon, false));
+  bits.push(comingUpSection(soon, events.soon));
   bits.push(section('Done', done, false));
   return bits;
 }

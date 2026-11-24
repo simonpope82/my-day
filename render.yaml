@@ -31,3 +31,5 @@ services:
         value: "1"
       - key: TRUST_PROXY
         value: "1"
+      - key: FAMILY_DATA_JSON
+        sync: false

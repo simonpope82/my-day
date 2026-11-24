@@ -164,6 +164,95 @@ h1 {
 .title { font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
 .meta { color: var(--muted); font-size: 16px; overflow-wrap: anywhere; }
 .card.late .meta { color: var(--red); font-weight: 700; }
+.card.event {
+  background: #f4f8ff;
+  border-color: #d5e4fb;
+  align-items: center;
+  padding: 12px 12px 12px 8px;
+}
+.card.event .when {
+  min-width: 108px;
+  max-width: 124px;
+  flex: 0 0 auto;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1d4f91;
+  line-height: 1.2;
+}
+.card.event .badge.cal { background: #e7f0ff; }
+.brief { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 4px; }
+.brief-card { border-radius: 20px; overflow: hidden; }
+.brief-card summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 8px 14px;
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.brief-card summary::-webkit-details-marker { display: none; }
+.brief-card .emoji { font-size: 36px; line-height: 1; width: 44px; text-align: center; }
+.brief-card ul { margin: 0; padding: 0 14px 14px 68px; }
+.brief-card li { margin: 8px 0; font-size: 18px; line-height: 1.35; }
+.brief-card a { color: inherit; font-weight: 700; }
+.brief-card[data-key="weather"] { background: #d7f0ff; }
+.brief-card[data-key="birthdays"] { background: #fde3ee; }
+.brief-card[data-key="parcels"] { background: #fff1cc; }
+.brief-card[data-key="jobs"] { background: #ebe4fb; }
+.brief-card:not([data-key="weather"]):not([data-key="birthdays"]):not([data-key="parcels"]):not([data-key="jobs"]) { background: #fff; }
+
+.section .pill {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #0369a1;
+  color: #fff;
+  font-size: 16px;
+  vertical-align: middle;
+}
+.reply {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #e0f2fe;
+  border: 1px solid #b9dff3;
+  border-radius: 18px;
+  padding: 8px;
+}
+.reply .tick { width: 48px; height: 48px; border-radius: 16px; }
+.reply .badge { width: 40px; height: 40px; }
+.reply-title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  border: 0;
+}
+.reply .title { font-size: 18px; }
+.open-link {
+  flex: 0 0 auto;
+  min-width: 72px;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: #0369a1;
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
+  text-decoration: none;
+  display: grid;
+  place-items: center;
+}
 
 .empty {
   margin-top: 48px;

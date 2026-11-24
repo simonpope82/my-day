@@ -61,7 +61,7 @@ SESSION_SECRET="$(read_secret SESSION_SECRET)"
 [[ ${#APP_PIN} -ge 4 ]] || die "APP_PIN missing in secrets.env"
 [[ ${#API_TOKEN} -ge 16 ]] || die "API_TOKEN missing in secrets.env"
 
-ENV_JSON="$(APP_PIN="$APP_PIN" API_TOKEN="$API_TOKEN" SESSION_SECRET="$SESSION_SECRET" GITHUB_TOKEN="${GITHUB_TOKEN:-}" node -e '
+ENV_JSON="$(APP_PIN="$APP_PIN" API_TOKEN="$API_TOKEN" SESSION_SECRET="$SESSION_SECRET" GITHUB_TOKEN="${GITHUB_TOKEN:-}" FAMILY_DATA_JSON="${FAMILY_DATA_JSON:-}" node -e '
 const keys = ["NODE_VERSION","APP_PIN","API_TOKEN","SESSION_SECRET","GITHUB_TOKEN","DATA_REPO","DATA_BRANCH","DATA_PATH","COOKIE_SECURE","TRUST_PROXY"];
 const values = {
   NODE_VERSION: "22",
@@ -75,6 +75,10 @@ const values = {
   COOKIE_SECURE: "1",
   TRUST_PROXY: "1"
 };
+if (process.env.FAMILY_DATA_JSON) {
+  keys.push("FAMILY_DATA_JSON");
+  values.FAMILY_DATA_JSON = process.env.FAMILY_DATA_JSON;
+}
 process.stdout.write(JSON.stringify(keys.map((key) => ({ key, value: values[key] }))));
 ')"
 

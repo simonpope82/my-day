@@ -25,7 +25,9 @@ One line is enough:
 
 The app picks a group from the words (English and Norwegian). Tap another colour to change it. Tick the box when it is done. Tick again to undo.
 
-Groups: Bills, To-do, Family, Health, Work, Home (car and house), Money, Other.
+Groups: Bills, To-do, Family, Health, Work, Business, Email, Home (car and house), Money, Other.
+
+Work is for a job. Business is for his companies, such as Pope Holding. Email is for messages that need a reply.
 
 A repeating item (day, week, month, year) jumps to the next date when you tick it.
 
@@ -53,6 +55,7 @@ Do not commit these. On Render they are environment variables. Locally they can 
 | `DATA_PATH` | already in `render.yaml` | `items.json` |
 | `COOKIE_SECURE` | already in `render.yaml` | `1` on Render |
 | `TRUST_PROXY` | already in `render.yaml` | `1` on Render |
+| `FAMILY_DATA_JSON` | Copy from the **family-pope** Render service | Tay's and Nina's calendars. Same value Family Hub already uses. |
 
 `./deploy-render.sh` creates `APP_PIN`, `API_TOKEN` and `SESSION_SECRET` in `secrets.env` the first time. It does not print them.
 
@@ -69,6 +72,16 @@ This code repo can be public. Render only needs to clone it. The running app wri
 The free service sleeps after a quiet spell. The first open can take up to a minute. The list is still safe. Data writes do not redeploy the site, because they land in `simonpope82/my-day-data`, not in this repo.
 
 Mute GitHub email for `my-day-data` if ticks start sending you mail.
+
+## Calendar
+
+Family Hub already loads the Google calendars as secret ICS links inside `FAMILY_DATA_JSON` (the `calendars` list: name, url, colour). Copy that one env var from the **family-pope** service onto **my-day**. A Render secret file named `family-data.json` works too, same as Family Hub.
+
+You can also set `FAMILY_DATA_JSON` to a short comma-separated list of `https://` or `webcal://` links if you do not want to copy the whole family file.
+
+Today's events show on the Today screen with a calendar icon and a time. The next 7 days show under Coming up. Events are read-only. The list still loads if a calendar does not. Results are cached for 15 minutes.
+
+`GET /api/today` adds `events` (and `calendarError` only when a calendar failed). Each event summary line starts with `Event:`.
 
 ## For the assistant
 
@@ -87,7 +100,7 @@ curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
   -H "Authorization: Bearer $MYDAY_API_TOKEN"
 ```
 
-`summary` is a short list for the 07:30 mail. `counts.label` is the "3 of 7 done" line. Dates are the Oslo calendar date (`Europe/Oslo`).
+`summary` is a short list for the 07:30 mail. Calendar lines start with `Event:`. The same events are in `events`. `counts.label` is the "3 of 7 done" line. Dates are the Oslo calendar date (`Europe/Oslo`).
 
 Add one line:
 
@@ -99,7 +112,29 @@ curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
   -d '{"text":"pay electricity bill friday 1200kr"}'
 ```
 
-You can also send fields: `title`, `category` (`bills`, `todo`, `family`, `health`, `work`, `home`, `money`, `other`), `due` (`YYYY-MM-DD`), `amount`, `notes`, `repeat` (`daily`, `weekly`, `monthly`, `yearly`).
+You can also send fields: `title`, `category` (`bills`, `todo`, `family`, `health`, `work`, `business`, `email`, `home`, `money`, `other`), `due` (`YYYY-MM-DD`), `amount`, `notes`, `repeat` (`daily`, `weekly`, `monthly`, `yearly`), `link` (http or https), `source` (for example `gmail` or `outlook`), `externalId` (dedupe key).
+
+`business` is for his companies (Pope Holding and the like). Words such as `pope holding`, `holding`, `faktura til`, `regnskap`, `revisor`, `styre`, `aksje` and `mva` land there. `work` stays for job search.
+
+`email` is a reply. Not-done email items show on Today under **Reply to**, with a count and an Open button when `link` is set. Send the same `externalId` again and the app returns the existing item with **200**, even if it is already done. It does not create a second one.
+
+```bash
+curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
+  "$MYDAY_URL/api/items" \
+  -H "Authorization: Bearer $MYDAY_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Invoice from supplier","category":"email","source":"gmail","externalId":"gmail:18f2abc","link":"https://mail.google.com/mail/u/0/#inbox/18f2abc"}'
+```
+
+A company task:
+
+```bash
+curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
+  "$MYDAY_URL/api/items" \
+  -H "Authorization: Bearer $MYDAY_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"faktura til kunde fra pope holding"}'
+```
 
 Mark done, or undo:
 
@@ -155,11 +190,63 @@ Prefer `POST /api/items` for new items. The app parses the line, keeps a conflic
       "doneAt": null,
       "lastDone": null,
       "history": [],
+      "link": "",
+      "source": "",
+      "externalId": "",
       "createdAt": "2026-11-24T07:00:00.000Z",
       "updatedAt": "2026-11-24T07:00:00.000Z"
     }
   ]
 }
 ```
+
+Morning brief. Post one brief per Oslo date. The same date replaces the previous brief. The app keeps about 14 days in `brief.json` in the private data repo, next to `items.json`. Do not repeat tasks, bills, email replies, or calendar events here. Those already come from the app. Weather is shown first.
+
+```bash
+curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
+  "$MYDAY_URL/api/brief" \
+  -H "Authorization: Bearer $MYDAY_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "date": "2026-11-24",
+    "sections": [
+      {
+        "key": "weather",
+        "title": "Weather",
+        "emoji": "🌧️",
+        "lines": [
+          {"text": "6°. Rain this afternoon."},
+          {"text": "Coat and boots."}
+        ]
+      },
+      {
+        "key": "birthdays",
+        "title": "Birthdays",
+        "emoji": "🎂",
+        "lines": [
+          {"text": "Nina, Friday."}
+        ]
+      },
+      {
+        "key": "parcels",
+        "title": "Parcels",
+        "emoji": "📦",
+        "lines": [
+          {"text": "Posten Ås. Code 4821."}
+        ]
+      },
+      {
+        "key": "jobs",
+        "title": "Jobs",
+        "emoji": "💼",
+        "lines": [
+          {"text": "Electrician, Ås", "link": "https://example.com/job/1"}
+        ]
+      }
+    ]
+  }'
+```
+
+`GET /api/brief?date=2026-11-24` returns `{ "brief": { "date", "sections" } }`. If that day has no brief, `brief` is `null`. `GET /api/today` includes the same `brief` for today. The Today screen shows it at the top. No brief means no card and no error.
 
 Other routes: `GET /api/me`, `GET /api/items/ITEM_ID`, `POST /api/parse` with `{"text":"..."}`, `POST /api/login` with `{"pin":"..."}` (phone only), `POST /api/logout`, `GET /health` (no secret, no items).
