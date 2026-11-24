@@ -53,6 +53,7 @@ Do not commit these. On Render they are environment variables. Locally they can 
 | `DATA_PATH` | already in `render.yaml` | `items.json` |
 | `COOKIE_SECURE` | already in `render.yaml` | `1` on Render |
 | `TRUST_PROXY` | already in `render.yaml` | `1` on Render |
+| `FAMILY_DATA_JSON` | Copy from the **family-pope** Render service | Tay's and Nina's calendars. Same value Family Hub already uses. |
 
 `./deploy-render.sh` creates `APP_PIN`, `API_TOKEN` and `SESSION_SECRET` in `secrets.env` the first time. It does not print them.
 
@@ -69,6 +70,16 @@ This code repo can be public. Render only needs to clone it. The running app wri
 The free service sleeps after a quiet spell. The first open can take up to a minute. The list is still safe. Data writes do not redeploy the site, because they land in `simonpope82/my-day-data`, not in this repo.
 
 Mute GitHub email for `my-day-data` if ticks start sending you mail.
+
+## Calendar
+
+Family Hub already loads the Google calendars as secret ICS links inside `FAMILY_DATA_JSON` (the `calendars` list: name, url, colour). Copy that one env var from the **family-pope** service onto **my-day**. A Render secret file named `family-data.json` works too, same as Family Hub.
+
+You can also set `FAMILY_DATA_JSON` to a short comma-separated list of `https://` or `webcal://` links if you do not want to copy the whole family file.
+
+Today's events show on the Today screen with a calendar icon and a time. The next 7 days show under Coming up. Events are read-only. The list still loads if a calendar does not. Results are cached for 15 minutes.
+
+`GET /api/today` adds `events` (and `calendarError` only when a calendar failed). Each event summary line starts with `Event:`.
 
 ## For the assistant
 
@@ -87,7 +98,7 @@ curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
   -H "Authorization: Bearer $MYDAY_API_TOKEN"
 ```
 
-`summary` is a short list for the 07:30 mail. `counts.label` is the "3 of 7 done" line. Dates are the Oslo calendar date (`Europe/Oslo`).
+`summary` is a short list for the 07:30 mail. Calendar lines start with `Event:`. The same events are in `events`. `counts.label` is the "3 of 7 done" line. Dates are the Oslo calendar date (`Europe/Oslo`).
 
 Add one line:
 

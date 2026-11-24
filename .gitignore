@@ -2,6 +2,7 @@ node_modules/
 secrets.env
 .env
 data/
+config/family-data.json
 *.log
 *.tmp
 .DS_Store

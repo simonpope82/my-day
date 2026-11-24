@@ -1,5 +1,7 @@
 'use strict';
 
+process.env.TZ = process.env.TZ || 'Europe/Oslo';
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -7,6 +9,7 @@ const { createStoreFromEnv } = require('./lib/store');
 const { createItem, applyFields } = require('./lib/items');
 const { buildToday, recentDone } = require('./lib/today');
 const { osloDate, osloWeekdayName } = require('./lib/dates');
+const { upcomingEvents, eventSummary } = require('./lib/calendars');
 const { isCategory, CATEGORIES } = require('./public/shared/categories');
 const auth = require('./lib/auth');
 
@@ -190,6 +193,15 @@ async function api(req, res, store, url) {
     const now = new Date();
     const view = buildToday(doc.items, now);
     view.weekday = osloWeekdayName(now);
+    view.events = [];
+    try {
+      const calendar = await upcomingEvents(now);
+      view.events = calendar.events;
+      if (calendar.error) view.calendarError = calendar.error;
+      if (calendar.events.length) view.summary = view.summary.concat(calendar.events.map(eventSummary));
+    } catch {
+      view.calendarError = 'Calendar not loaded';
+    }
     return send(res, 200, view);
   }
 
