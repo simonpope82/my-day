@@ -6,7 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { createStoreFromEnv } = require('./lib/store');
-const { createItem, applyFields } = require('./lib/items');
+const { createItem, applyFields, cleanExternalId } = require('./lib/items');
 const { buildToday, recentDone } = require('./lib/today');
 const { osloDate, osloWeekdayName } = require('./lib/dates');
 const { upcomingEvents, eventSummary } = require('./lib/calendars');
@@ -230,10 +230,22 @@ async function api(req, res, store, url) {
   if (req.method === 'POST' && pathname === '/api/items') {
     const body = await readJson(req);
     const now = new Date();
-    const item = createItem(body, now);
-    const doc = await store.update((draft) => { draft.items.push(item); });
-    const saved = doc.items.find((row) => row.id === item.id) || item;
-    return send(res, 201, { item: saved });
+    const externalId = cleanExternalId(body.externalId);
+    let created = true;
+    let item = null;
+    await store.update((draft) => {
+      if (externalId) {
+        const existing = draft.items.find((row) => row.externalId === externalId);
+        if (existing) {
+          item = existing;
+          created = false;
+          return { skip: true };
+        }
+      }
+      item = createItem(body, now);
+      draft.items.push(item);
+    });
+    return send(res, created ? 201 : 200, { item });
   }
 
   if (one && req.method === 'GET') {

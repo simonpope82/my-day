@@ -11,6 +11,8 @@
     { id: 'family', name: 'Family', color: '#C23B6E', tint: '#FDE3EE' },
     { id: 'health', name: 'Health', color: '#0E8A52', tint: '#DDF5E8' },
     { id: 'work', name: 'Work', color: '#5B3CC4', tint: '#EBE4FB' },
+    { id: 'business', name: 'Business', color: '#123A63', tint: '#E4EEF6' },
+    { id: 'email', name: 'Email', color: '#0369A1', tint: '#E0F2FE' },
     { id: 'home', name: 'Home', color: '#0C7C86', tint: '#D9F3F4' },
     { id: 'money', name: 'Money', color: '#8A6800', tint: '#FBF0CC' },
     { id: 'other', name: 'Other', color: '#5E6670', tint: '#ECEDEF' },

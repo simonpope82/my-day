@@ -180,6 +180,55 @@ h1 {
   line-height: 1.2;
 }
 .card.event .badge.cal { background: #e7f0ff; }
+.section .pill {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #0369a1;
+  color: #fff;
+  font-size: 16px;
+  vertical-align: middle;
+}
+.reply {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #e0f2fe;
+  border: 1px solid #b9dff3;
+  border-radius: 18px;
+  padding: 8px;
+}
+.reply .tick { width: 48px; height: 48px; border-radius: 16px; }
+.reply .badge { width: 40px; height: 40px; }
+.reply-title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  border: 0;
+}
+.reply .title { font-size: 18px; }
+.open-link {
+  flex: 0 0 auto;
+  min-width: 72px;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: #0369a1;
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
+  text-decoration: none;
+  display: grid;
+  place-items: center;
+}
 
 .empty {
   margin-top: 48px;

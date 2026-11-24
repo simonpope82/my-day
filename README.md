@@ -25,7 +25,9 @@ One line is enough:
 
 The app picks a group from the words (English and Norwegian). Tap another colour to change it. Tick the box when it is done. Tick again to undo.
 
-Groups: Bills, To-do, Family, Health, Work, Home (car and house), Money, Other.
+Groups: Bills, To-do, Family, Health, Work, Business, Email, Home (car and house), Money, Other.
+
+Work is for a job. Business is for his companies, such as Pope Holding. Email is for messages that need a reply.
 
 A repeating item (day, week, month, year) jumps to the next date when you tick it.
 
@@ -110,7 +112,29 @@ curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
   -d '{"text":"pay electricity bill friday 1200kr"}'
 ```
 
-You can also send fields: `title`, `category` (`bills`, `todo`, `family`, `health`, `work`, `home`, `money`, `other`), `due` (`YYYY-MM-DD`), `amount`, `notes`, `repeat` (`daily`, `weekly`, `monthly`, `yearly`).
+You can also send fields: `title`, `category` (`bills`, `todo`, `family`, `health`, `work`, `business`, `email`, `home`, `money`, `other`), `due` (`YYYY-MM-DD`), `amount`, `notes`, `repeat` (`daily`, `weekly`, `monthly`, `yearly`), `link` (http or https), `source` (for example `gmail` or `outlook`), `externalId` (dedupe key).
+
+`business` is for his companies (Pope Holding and the like). Words such as `pope holding`, `holding`, `faktura til`, `regnskap`, `revisor`, `styre`, `aksje` and `mva` land there. `work` stays for job search.
+
+`email` is a reply. Not-done email items show on Today under **Reply to**, with a count and an Open button when `link` is set. Send the same `externalId` again and the app returns the existing item with **200**, even if it is already done. It does not create a second one.
+
+```bash
+curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
+  "$MYDAY_URL/api/items" \
+  -H "Authorization: Bearer $MYDAY_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Invoice from supplier","category":"email","source":"gmail","externalId":"gmail:18f2abc","link":"https://mail.google.com/mail/u/0/#inbox/18f2abc"}'
+```
+
+A company task:
+
+```bash
+curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
+  "$MYDAY_URL/api/items" \
+  -H "Authorization: Bearer $MYDAY_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"faktura til kunde fra pope holding"}'
+```
 
 Mark done, or undo:
 
@@ -166,6 +190,9 @@ Prefer `POST /api/items` for new items. The app parses the line, keeps a conflic
       "doneAt": null,
       "lastDone": null,
       "history": [],
+      "link": "",
+      "source": "",
+      "externalId": "",
       "createdAt": "2026-11-24T07:00:00.000Z",
       "updatedAt": "2026-11-24T07:00:00.000Z"
     }

@@ -55,6 +55,16 @@ test('family beats a generic to-do word', () => {
   assert.equal(item.due, addDays(today, 1));
 });
 
+test('business is separate from work and bills', () => {
+  assert.equal(parse('pope holding styremøte').category, 'business');
+  assert.equal(parse('faktura til kunde').category, 'business');
+  assert.equal(parse('regnskap hos revisor').category, 'business');
+  assert.equal(parse('mva oppgave').category, 'business');
+  assert.equal(parse('aksje i holding').category, 'business');
+  assert.equal(parse('job interview monday').category, 'work');
+  assert.equal(parse('pay electricity bill friday').category, 'bills');
+});
+
 test('work meeting on monday', () => {
   const item = parse('møte med kunde mandag');
   assert.equal(item.category, 'work');
