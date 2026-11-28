@@ -250,3 +250,16 @@ curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
 `GET /api/brief?date=2026-11-24` returns `{ "brief": { "date", "sections" } }`. If that day has no brief, `brief` is `null`. `GET /api/today` includes the same `brief` for today. The Today screen shows it at the top. No brief means no card and no error.
 
 Other routes: `GET /api/me`, `GET /api/items/ITEM_ID`, `POST /api/parse` with `{"text":"..."}`, `POST /api/login` with `{"pin":"..."}` (phone only), `POST /api/logout`, `GET /health` (no secret, no items).
+
+## Pope Christmas (julegave)
+
+Pope Christmas at `https://simonpope82.github.io/julegave/` uses this same service to sync the gift list. CORS is allowed only for that GitHub Pages origin. The phone app signs in with a PIN (the server stores a hash only). The assistant uses the same Bearer token as above, not the PIN.
+
+```bash
+curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 90 \
+  "$MYDAY_URL/api/julegave" \
+  -H "Authorization: Bearer $MYDAY_API_TOKEN"
+```
+
+`GET /api/julegave/status` is public and returns `{ "pinSet": true }` or `false`. `GET` and `PUT /api/julegave` need the token (or a PIN session). `PUT` replaces the sheet but never changes the PIN hash. Data lives in `julegave.json` in `simonpope82/my-day-data`, next to `items.json`. The file shape and PIN calls are in the Pope Christmas README, under **For the assistant**.
+
